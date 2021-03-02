@@ -49,11 +49,13 @@ def print_spec(args: argparse.Namespace) -> None:
     print(serialize_spec(UNICOREFUZZ_SPEC))
 
 
+# ucf attach调用的函数
 def wrap_probe(args: argparse.Namespace) -> None:
     """
     Attach, break and forward memory from target
     Former probewrapper.py
     """
+    # 调用的是unicorefuzz子项目中的probe_wrapper
     from unicorefuzz.probe_wrapper import ProbeWrapper
 
     ProbeWrapper(load_conf(args)).wrap_gdb_target()
@@ -106,12 +108,14 @@ def fuzz(args: argparse.Namespace) -> None:
     restart = args.restart
     if restart and id != "0":
         raise ValueError("Only master (`id 0`) may `reset` the state.")
+    # 根据id是否为0确定模式
     if id == "0":
         id = "master"
         mode = "-M master"
     else:
         id = "fuzzer{}".format(id)
         mode = "-S {}".format(id)
+    # Unicorefuzz应该是初始化一个实例
     ucf = Unicorefuzz(load_conf(args))
 
     if restart:
@@ -120,6 +124,7 @@ def fuzz(args: argparse.Namespace) -> None:
         except:
             pass
 
+    # 下面是初始化各种afl启动时的参数
     afl_inputs = ucf.config.AFL_INPUTS
     # See if output is already created, if not, we want to rerun afl instead of restart.
     if os.path.isdir(os.path.abspath(os.path.join(ucf.config.AFL_OUTPUTS, id))):
@@ -182,6 +187,8 @@ def fuzz(args: argparse.Namespace) -> None:
             config_path=config_path,
         )
     )
+
+    #启动fuzz
     if args.print_outputs:
         print("[*] Starting: ", run)
     if os.getenv("UCF_DEBUG_PRINT_COMMAND_ONLY"):
@@ -191,6 +198,7 @@ def fuzz(args: argparse.Namespace) -> None:
         os.system(run)
 
 
+# 初始化内核，调用afl-system-config
 def kernel_setup(args: argparse.Namespace) -> None:
     """
     Sets up the kernel options needed to run AFL.
@@ -243,15 +251,35 @@ def create_subparser(
 
 
 if __name__ == "__main__":
+    '''
+        解析参数结构：
+            subparser1
+                subargument1
+                subargument2
+                ...
+            subparser2
+                subargument1
+                subargument2
+                ...
+            subparser3
+                subargument1
+                subargument2
+                ...
+    '''
+    #初始化parser(总parser)
     parser = argparse.ArgumentParser(
         description="Unicorefuzz, emulate kernels with AFL++-Unicorn"
     )
     subparsers = parser.add_subparsers(help="What unicorefuzz function to use.")
+    #添加attach子命令
     probe_wrapper = create_subparser(subparsers, "attach", wrap_probe)
 
+    #添加emu子命令
     harness = create_subparser(
         subparsers, "emu", emulate, aliases=["emulate"], uses_input=True
     )
+
+    #添加-d（debug）选项
     harness.add_argument(
         "-d",
         "--debug",
@@ -274,6 +302,7 @@ if __name__ == "__main__":
         help="Wait for the state directory to be present",
     )
 
+    #fuzz子选项
     sub_fuzz = create_subparser(subparsers, "fuzz", fuzz)
     sub_fuzz.add_argument(
         "-i",
@@ -311,6 +340,7 @@ if __name__ == "__main__":
         help="Ignore OS settings for coredump notifications and governor. Prefer to run `ucf sysconf -S` and not set this flag.",
     )
 
+    #await子选项
     sub_await = create_subparser(subparsers, "await", wait_for_wrapper)
     sub_afl_path = create_subparser(subparsers, "afl-path", print_afl_path)
     sub_spec = create_subparser(subparsers, "spec", print_spec)
