@@ -1,3 +1,5 @@
+# unicorefuzz的配置文件
+
 # This is the main config file of Unicorefuzz.
 # It should be adapted for each fuzzing run.
 import os
@@ -8,8 +10,10 @@ from unicorn.x86_const import UC_X86_REG_RAX, UC_X86_REG_RDX, UC_X86_REG_RDI
 from unicorefuzz.unicorefuzz import Unicorefuzz
 
 # A place to put scratch memory to. Non-kernelspace address should be fine.
+# 把scratch memory（不知道什么东西） 移动到这个地址，非内核地址页也行？
 SCRATCH_ADDR = 0x80000
 # How much scratch to add. We don't ask for much. Default should be fine.
+# 大小
 SCRATCH_SIZE = 0x1000
 
 # The page size used by the emulator. Optional.
@@ -23,23 +27,29 @@ GDB_HOST = "localhost"
 GDB_PORT = 1234
 
 # Either set this to load the module from the VM and break at module + offset...
+# 断在这个模块上，并且在OFFSET位置下断
 MODULE = "procfs1"
 BREAK_OFFSET = 0x10
 
 # Or this to break at a fixed offset.
+# 准确地址
 BREAK_ADDR = None
 # You cannot set MODULE and BREAKOFFSET at the same time
 
 # Additional exits here.
 # The Exit at entry + LENGTH will be added automatically.
+# 退出点
 EXITS = []
 # Exits realtive to the initial rip (entrypoint + addr)
+# 相对退出点
 ENTRY_RELATIVE_EXITS = []
 
 # The location used to store data and logs
+# 存储数据和日志的目录
 WORKDIR = os.path.join(os.getcwd(), "unicore_workdir")
 
 # Where AFL input should be read from
+# AFL_INPUTS 和 AFL_OUTPUTS
 AFL_INPUTS = os.path.join(os.getcwd(), "afl_inputs")
 # Where AFL output should be placed at
 AFL_OUTPUTS = os.path.join(os.getcwd(), "afl_outputs")
@@ -52,15 +62,21 @@ def init_func(uc):
     """
     An init function called before forking.
     This function may be used to set additional unicorn hooks and things.
+        用来设置额外的unicorn hook和其他东西
     If you uc.run_emu here, you will trigger the forkserver. Try not to/do that in place_input. :)
+        不要在这里uc.run_emu，这个玩意会触发forkserver
     """
     pass
 
 
 # This function gets the current input and places it in the memory.
+    # 获得当前输入并且在内存里取代它
 # It will be called for each execution, so keep it lightweight.
+    # 每次执行都会调用
 # This can be compared to a testcase in libfuzzer.
-# if you want to ignore an input, you can os._exit(0) here (anything else is a lot slower).
+    # 可以类比libfuzzer里的测试案例
+# if you want to ignore an input, you can os._exit(0) here (anything else is a lot slower)
+    # 如果想忽略输入，os._exit(0)
 def place_input_skb(ucf: Unicorefuzz, uc: Uc, input: bytes) -> None:
     """
     Places the input in memory and alters the input.

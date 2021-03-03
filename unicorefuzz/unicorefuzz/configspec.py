@@ -1,3 +1,5 @@
+# 读取和验证配置
+# spec：规格
 """
 This thing reads and validates the config.
 The actual spec can be found a few lines below.
@@ -6,6 +8,8 @@ Lots of Required and Optional things.
 import collections
 import inspect
 import os
+
+# 类型的各种库，第一次见hh
 from types import ModuleType
 from typing import (
     List,
@@ -24,6 +28,7 @@ import unicorefuzz.unicorefuzz
 from unicorefuzz.unicorefuzz import Unicorefuzz
 from unicorefuzz.unicorefuzz import archs
 
+# collections的namedtuple方法，命名的元组
 Required = collections.namedtuple("Required", "key type description param_names")
 Required.__new__.__defaults__ = ("*args",)
 Optional = collections.namedtuple(
@@ -38,26 +43,38 @@ def nop_func(*args, **kwargs) -> None:
     pass
 
 
+# 初始化avatar目标结构，理解avatar的重要函数
+# 在gdb_probe_wrap中单单调用Avatar，不知道他是怎么连接端口等等的。。
 def init_avatar_target(ucf: Unicorefuzz, avatar: Avatar) -> Target:
     """
+        初始化probe wrapper使用的target
     Init the target used by the probe wrapper.
+        probe_wrapper会设置断点，导向寄存器和内存
     The probe_wrapper will set the breakpoint and forward regs and mem using this target.
+
     :param ucf: Unicorefuzz instance, access config using ucf.config.
     :param avatar: Initialized Avatar to add target to.
+        返回一个初始化后的target
     :return: An initialized target, added to Avatar.
     """
     from avatar2 import GDBTarget
 
+    # 调用avatar的add_target方法
     target = avatar.add_target(
         GDBTarget,
-        gdb_ip=ucf.config.GDB_HOST,
-        gdb_port=ucf.config.GDB_PORT,
-        gdb_executable=ucf.config.GDB_PATH,
+        gdb_ip=ucf.config.GDB_HOST, # gdb ip
+        gdb_port=ucf.config.GDB_PORT, # gdb 端口
+        gdb_executable=ucf.config.GDB_PATH, # gdb执行路径
     )
+
+    # 初始化
     target.init()
+
+    # 返回
     return target
 
 
+# 自动完成？？ ipython的特性吗？？
 # Just for autocompletion
 ARCH = X86  # type Architecture
 PAGE_SIZE = (
@@ -68,6 +85,7 @@ GDB_HOST = (
 ) = WORKDIR = GDB_PATH = UNICORE_PATH = AFL_OUTPUT = AFL_DICT = ""  # type str
 init_func = place_input = nop_func  # type Callable
 
+# 好像也是用来解析一些东西的，在后面提供给config
 # The spec the config.py needs to abide by.
 UNICOREFUZZ_SPEC = [
     Required("ARCH", list(archs.keys()), "What architecture to emulate"),
@@ -176,12 +194,16 @@ UNICOREFUZZ_SPEC = [
 ]  # type: List[Union[Required, Optional]]
 
 
+# 是否是可调用类型
 def is_callable_type(typevar: Union[Callable, callable, TypeVar]) -> bool:
     """
     Returns True if typevar is callable or Callable
     """
+    # 如果是以下两种情况返回真，表明是可调用的
     if typevar == callable or typevar == Callable:
         return True
+
+    # 冷静pycharms的静态分析？？
     # This return is split in 2 parts to calm down pycharms static analyzer.
     if hasattr(typevar, "__origin__"):
         # noinspection PyUnresolvedReferences
@@ -189,26 +211,35 @@ def is_callable_type(typevar: Union[Callable, callable, TypeVar]) -> bool:
     return False
 
 
+# 接受一个函数或者一个lambda表达式的源
 def clean_source(func: Callable[[Any], Any]) -> str:
     """
     Receives the source of a function or lambda
     :param func: The function to serialize
     :return: The included source code
     """
+    # 调用inspect的getsource方法，返回的应该是一个字符串，然后处理之
     source = inspect.getsource(func).split(":", 1)[1].strip()
+    # 如果以","结尾
     if source.endswith(","):
         # special case for lambdas
         return source[:-1]
     return source
 
 
+# 字符串化规格spec
 def stringify_spec_entry(entry: Union[Optional, Required]) -> str:
     """Make a nice string out of it."""
+    # 获得entrytype
     entrytype = entry.type
     if isinstance(entrytype, type):
         entrytype = entrytype.__name__
     # ugly hack: We don't want a list to be ['like', 'this'] but ["with", "json", "quotes"]...
+    
+    # 单引号变双引号
     entrytype = "{}".format(entrytype).replace("'", '"')
+
+    # 如果是Required，并且是函数类型（callable）
     if isinstance(entry, Required):
         if is_callable_type(entry.type):
             return '''def {}({}):
@@ -220,13 +251,17 @@ def stringify_spec_entry(entry: Union[Optional, Required]) -> str:
     '''.format(
                 entry.key, entry.param_names, entrytype, entry.description
             )
+    # 否则返回一个注释。 interesting
         return '"""{}"""\n{} = TODO #  type {}'.format(
             entry.description, entry.key, entrytype
         )
     if isinstance(entry, Optional):
         # If it's a func, we only want the print the content.
         default = entry.default
+        # 如果可调用
+        # callable和is_callable_type不重复吗？ 不懂
         if callable(entry.default):
+        # clean_source它
             default = clean_source(default)
         if is_callable_type(entry.type):
             default = clean_source(eval(default))
@@ -247,6 +282,7 @@ def stringify_spec_entry(entry: Union[Optional, Required]) -> str:
     )
 
 
+# 序列化规格，打印字符串
 def serialize_spec(spec: List[Union[Optional, Required]]) -> str:
     """
     Prints a checker spec in a readable format, close to python.
@@ -262,20 +298,26 @@ def serialize_spec(spec: List[Union[Optional, Required]]) -> str:
     )
 
 
+# 类型匹配
 def type_matches(val: Any, expected_type: Union[List, TypeVar, None]) -> bool:
     """
+        返回是否类型和期望相等
     Returns if the type equals the expectation
     :param val: The value
     :param expected_type: The type or a list of allowed values
     :return: True if the type is correct, False otherwise
     """
+    # 如果是列表类型
     if isinstance(expected_type, list):
         # A list of allowed values is given, not an actual type
         return val in expected_type
+    # 如果期望类型是Any，直接返回True
     elif expected_type == Any:
         return True
+    # 期望类型为空，返回val也是空
     elif expected_type is None:
         return val is None
+    # 再不行就判断__origin__属性了，__origin__不了解
     elif hasattr(expected_type, "__origin__"):
         # Something from the typing module
         if expected_type.__origin__ == Union:
@@ -301,6 +343,7 @@ def type_matches(val: Any, expected_type: Union[List, TypeVar, None]) -> bool:
                 if not type_matches(el, expected_type.__args__[0]):
                     return False
             return True
+    # TypeVar 太复杂，直接略过了
     elif isinstance(expected_type, TypeVar):
         # too complex to check if TypeVars (List[TypeVar]) are alright... Treat like Any
         return True
@@ -309,6 +352,7 @@ def type_matches(val: Any, expected_type: Union[List, TypeVar, None]) -> bool:
     return False
 
 
+# 检查类型
 def check_type(name: str, val: str, expected_type: Union[List, TypeVar, None]) -> None:
     """
     returns and converts if necessary
@@ -324,15 +368,20 @@ def check_type(name: str, val: str, expected_type: Union[List, TypeVar, None]) -
         )
 
 
+# 通过路径引入一个python模块
 def import_py(mod_name: str, mod_path: str, silent: bool = False) -> ModuleType:
     """
     Imports a python module by path
+        模块名字
     :param mod_name: the name the module should be imported by
+        模块路径
     :param mod_path: the path to load the module from
+        安静模式
     :param silent: If True, nothing will be printed
     :return: the module, as reference
     """
     # Python 3.5+, see https://stackoverflow.com/questions/67631/how-to-import-a-module-given-the-full-path for others.
+    # 如果不存在这个文件
     if not os.path.isfile(mod_path):
         raise IOError(
             "Could not open config at {} as file. Make sure it exists.".format(
@@ -340,18 +389,23 @@ def import_py(mod_name: str, mod_path: str, silent: bool = False) -> ModuleType:
             )
         )
     else:
+    # 如果存在，就打印debug信息
         if not silent:
             print("[+] Reading config from {}".format(os.path.abspath(mod_path)))
     try:
         # python3.5+
+        # 引入importlib.util库
         import importlib.util
-
+        # 调用spec_from_file_location
+        # spec规格，不懂
         spec = importlib.util.spec_from_file_location(mod_name, mod_path)
         if not spec:
             raise EnvironmentError(
                 "Could not load {} from {}".format(mod_name, mod_path)
             )
+        # 从spec规格当中提取出模块
         mod = importlib.util.module_from_spec(spec)
+        # 返回执行模块(loader方法？)
         return unicorefuzz.__loader__.exec_module(mod)
     except EnvironmentError:
         raise
@@ -367,12 +421,14 @@ def import_py(mod_name: str, mod_path: str, silent: bool = False) -> ModuleType:
             )
 
 
+# 加载配置
 def load_config(path: str, silent: bool = False) -> ModuleType:
     """
     :param path: path to config.py (including filename)
     :param silent: If True, nothing will be printed
     :return: Loaded config (or ValueError)
     """
+    # 获得绝对地址
     path = os.path.abspath(path)
     config = import_py("unicoreconfig", path, silent=silent)
     # path of the actual config file
@@ -380,6 +436,7 @@ def load_config(path: str, silent: bool = False) -> ModuleType:
     config.filename = os.path.basename(config.path)  # type: str
     # config.folder is the folder containing the config
     config.folder = os.path.dirname(config.path)  # type: str
+    # 应用spec，实现就在限免
     apply_spec(config, UNICOREFUZZ_SPEC, silent=silent)
     return config
 
@@ -388,9 +445,13 @@ def apply_spec(
     module: Any, spec: List[Union[Optional, Required]], silent: bool = False
 ) -> None:
     """
+        检查config是否实现了spec，部分spec是否丢失
     Checks if config implements the spec or parts are missing.
+        填充可选值和其他各个默认值
     Fills in Optional() values with their respective default values.
+        如果Optional defaults是可调用的，他们将被调用，目前的module将作为参数
     If Optional defaults are callable, they will be called with the current module as parameter.
+        spec是顺序可迭代的
     The spec is iterated in order - make sure optional values only depends on previous values.
 
     In case the spec fails, errors out with ValueError.
@@ -399,6 +460,7 @@ def apply_spec(
     :param silent: If False, will print info about replaced defaults
     """
     errors = []
+    # 根据silent设置print_maybe函数
     if silent:
 
         def print_maybe(*args):
@@ -410,6 +472,7 @@ def apply_spec(
             print(*args)
 
     for entry in spec:
+        # 如果module没有这个entry
         if not hasattr(module, entry.key):
             # Entry not found.
             if isinstance(entry, Optional):
@@ -423,6 +486,7 @@ def apply_spec(
                         entry.key, printable, entry.description
                     )
                 )
+                # 设置属性
                 setattr(module, entry.key, default)
             else:
                 print_maybe(
@@ -433,8 +497,10 @@ def apply_spec(
                 errors.append(entry)
         else:
             # Value found. Check.
+            # 找到了值
             val = getattr(module, entry.key)
             try:
+                # 检查类型
                 check_type(entry.key, val, entry.type)
             except ValueError as ex:
                 print_maybe(

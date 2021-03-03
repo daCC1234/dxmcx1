@@ -167,14 +167,18 @@ def fuzz(args: argparse.Namespace) -> None:
     afl = os.path.join(afl_path, "afl-fuzz")
     ucf_main = os.path.join(ucf.config.UNICORE_PATH, "ucf")
 
+    # 如果设置了UCF_DEBUG_START_GDB 启动gdb，在gdb中启动afl
     if os.getenv("UCF_DEBUG_START_GDB"):
         print("[d] UCF_DEBUG_START_GDB set. Starting GDB, raising AFL timeouts.")
         afl_timeout = "99999999+"
         afl = "{gdb} {afl} --args {afl}".format(gdb=ucf.config.GDB_PATH, afl=afl)
 
+    #设置env环境变量
     env = 'PATH="{}:$PATH" LIBUNICORN_PATH="{}" AFL_COMPCOV_LEVEL="{}"'.format(
         afl_path, libunicorn_path, afl_compcov_level
     )
+
+    # print_outputs
     if args.print_outputs:
         env = "{} AFL_DEBUG_CHILD_OUTPUT=1 ".format(env)
     if args.yolo:
@@ -182,6 +186,7 @@ def fuzz(args: argparse.Namespace) -> None:
             env
         )
 
+    # 运行的命令
     run = (
         "{env} {afl} -U -m none -i {afl_in} -o {afl_out} -t {afl_timeout} {mode} "
         "-- python3 {ucf_main} emu {emu_params} -c {config_path} @@ || exit 1".format(
@@ -208,11 +213,12 @@ def fuzz(args: argparse.Namespace) -> None:
         os.system(run)
 
 
-# 初始化内核，调用afl-system-config
+# 初始化内核，调用afl-system-config（os.system）
 def kernel_setup(args: argparse.Namespace) -> None:
     """
     Sets up the kernel options needed to run AFL.
     """
+    # 初始化实例
     ucf = Unicorefuzz(load_conf(args))
     os.chdir(ucf.afl_path)
     run = "./afl-system-config || exit 1"
@@ -222,6 +228,7 @@ def kernel_setup(args: argparse.Namespace) -> None:
     os.system(run)
 
 
+# 创建子解析器， 和命令行解析相关
 # noinspection PyProtectedMember,PyDefaultArgument
 def create_subparser(
     subparsers: argparse._SubParsersAction,
@@ -241,7 +248,9 @@ def create_subparser(
     :param uses_input: if an input file can be supplied using `-i`
     :return: the initialized and added new subparser
     """
+    # 调用subparsers创建一个子解析器
     subparser = subparsers.add_parser(name, aliases=aliases, help=func.__doc__)
+    # 设置默认的调用函数
     subparser.set_defaults(function=func)
     if uses_input:
         subparser.add_argument(
@@ -312,8 +321,9 @@ if __name__ == "__main__":
         help="Wait for the state directory to be present",
     )
 
-    #fuzz子选项
+    # fuzz子选项
     sub_fuzz = create_subparser(subparsers, "fuzz", fuzz)
+    # AFL多fuzz结构id号
     sub_fuzz.add_argument(
         "-i",
         "--id",
@@ -321,6 +331,7 @@ if __name__ == "__main__":
         default="0",
         help="The AFL multi fuzzer id to use (0 for master).",
     )
+    # 在运行之前清理afl_output输出目录
     sub_fuzz.add_argument(
         "-r",
         "--restart",
@@ -328,6 +339,7 @@ if __name__ == "__main__":
         action="store_false",
         help="If set, clears the afl_output directory before running.\nOnly works for master.\nDANGEROUS!!",
     )
+    # 打印所有的子输出
     sub_fuzz.add_argument(
         "-P",
         "--print-outputs",
@@ -335,6 +347,8 @@ if __name__ == "__main__":
         action="store_true",
         help="When fuzing, print all child output (for debug)",
     )
+
+    # 追踪孩子调试
     sub_fuzz.add_argument(
         "-t",
         "--trace",
@@ -342,6 +356,8 @@ if __name__ == "__main__":
         action="store_true",
         help="Enables debug tracing for children. Slow. Only useful with -P.",
     )
+
+    # 忽略一些系统的设置
     sub_fuzz.add_argument(
         "-y",
         "--yolo",
@@ -360,6 +376,7 @@ if __name__ == "__main__":
     #    subparsers, "angr", run_angr, aliases=["concolic"], uses_input=True
     # )
 
+    # 创建sysconf子解析器
     init_system = create_subparser(subparsers, "sysconf", kernel_setup)
     init_system.add_argument(
         "-S",
@@ -369,6 +386,7 @@ if __name__ == "__main__":
         help="Auto escalate privileges",
     )
 
+    # 解析参数
     args = parser.parse_args()
 
     if hasattr(args, "function"):

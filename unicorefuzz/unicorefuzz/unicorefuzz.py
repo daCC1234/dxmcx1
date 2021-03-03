@@ -307,7 +307,7 @@ class Unicorefuzz:
             '''
             input_file_name = os.path.join(self.requestdir, "{:016x}".format(addr))
             dump_file_name = os.path.join(self.statedir, "{:016x}".format(base_address))
-            # 如果dump_file_name+".rejected" 存在，直接kill
+            # 如果 dump_file_name + ".rejected" 存在，直接kill
             if os.path.isfile(dump_file_name + REJECTED_ENDING): # ".rejected"
                 print("CAN I HAZ EXPLOIT?")
                 os.kill(os.getpid(), signal.SIGSEGV)

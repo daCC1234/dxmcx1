@@ -1,3 +1,4 @@
+
 #!/usr/bin/env python
 """
 Main (Unicorn-)Harness, used alongside AFL.
@@ -8,7 +9,7 @@ import os
 import sys
 import time
 from typing import Optional, Tuple, Dict, List
-
+# 引入capstone
 from capstone import Cs
 from unicornafl import *
 
@@ -24,12 +25,15 @@ from unicorefuzz.unicorefuzz import (
 CHILD_SHOULD_PRINT = os.getenv("AFL_DEBUG_CHILD_OUTPUT")
 
 
+# 调试输出指令
 def unicorn_debug_instruction(
     uc: Uc, address: int, size: int, user_data: "Unicorefuzz"
 ) -> None:
     cs = user_data.cs  # type: Cs
     try:
+        # 读内存
         mem = uc.mem_read(address, size)
+        # 调用cs disasm_lite方法反编译
         for (cs_address, cs_size, cs_mnemonic, cs_opstr) in cs.disasm_lite(
             bytes(mem), size
         ):
@@ -49,6 +53,7 @@ def unicorn_debug_instruction(
             print("    Instr: {:#016x}:\t{}\t{}".format(address, cs_mnemonic, cs_opstr))
 
 
+# block调试输出
 def unicorn_debug_block(uc: Uc, address: int, size: int, user_data: None) -> None:
     print("Basic Block: addr=0x{:016x}, size=0x{:016x}".format(address, size))
 
