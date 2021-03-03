@@ -36,7 +36,10 @@ class ProbeWrapper(Unicorefuzz):
             f.write(mem)
         print("[*] {}: Dumped 0x{:016x}".format(datetime.now(), base_address))
 
-    # 转移请求？ 从avatar 转移到 output_path
+    # 启动监视，dump内存，forever loop
+    '''
+        文件名（dump内存的地址） -> dump的内存
+    '''
     def forward_requests(
         self, target: Target, requests_path: str, output_path: str
     ) -> None:
@@ -98,7 +101,13 @@ class ProbeWrapper(Unicorefuzz):
                 os.remove(os.path.join(requests_path, filename))
             filenames = os.listdir(requests_path)
 
-    # gdb的一层封装
+    # 附加到gdb上，设置断点，导向内存
+    # 和Avatar交互
+    # 感觉Avatar的作用就是实际的控制程序的执行的
+    # set_breakpoint() 方法
+    # cont()
+    # wait()
+    # read_register()
     def wrap_gdb_target(self, clear_state: bool = True) -> None:
         """
         Attach to a GDB target, set breakpoint, forward Memory
@@ -207,20 +216,31 @@ class ProbeWrapper(Unicorefuzz):
             print("[+] Creating request folder")
             os.mkdir(request_path)
 
+        # 调用forward_requests 作用未知
         self.forward_requests(target, request_path, output_path)
         print("[*] Initial dump complete. Listening for requests from ucf emu.")
 
+        # inotify 作用未知（可能是监控文件行为的？）
+        '''
+            inotify是一种文件变化通知机制，Linux内核从2.6.13开始引入，是一种跨平台的机制，
+        在Linux、BSD、windows和Mac OS系统中各有支持的组件。
+
+        '''
         i = inotify.adapters.Inotify()
         # noinspection PyUnresolvedReferences
+        # add_watch()方法  IN_CLOSE_WRITE：可写文件被关闭
         i.add_watch(request_path, mask=inotify.constants.IN_CLOSE_WRITE)
         for event in i.event_gen(yield_nones=False):
             # print("Request: ", event)
+            # 又一次调用forword_requests方法
             self.forward_requests(target, request_path, output_path)
 
         print("[*] Exiting probe wrapper (keyboard interrupt)")
 
 
 if __name__ == "__main__":
+
+    # if-else给config_path赋值
     if len(sys.argv) == 2:
         config_path = sys.argv[1]
         if sys.argv[1] == "-h" or sys.argv[1] == "--help":
@@ -232,7 +252,10 @@ if __name__ == "__main__":
             "Too many arguments. Only expected (optional) parameter: config.py"
         )
     else:
+        # os的getcwd方法 未知
         config_path = os.getcwd()
+    # configspec: unicorefuzz中的一个类 加载配置
     config = configspec.load_config(config_path)
 
+    # 利用config初始化ProbeWrapper,然后调用wrap_gdb_target方法
     ProbeWrapper(config).wrap_gdb_target()

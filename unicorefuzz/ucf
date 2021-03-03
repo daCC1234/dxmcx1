@@ -58,9 +58,12 @@ def wrap_probe(args: argparse.Namespace) -> None:
     # 调用的是unicorefuzz子项目中的probe_wrapper
     from unicorefuzz.probe_wrapper import ProbeWrapper
 
+    # 调用avatar2直到触发断点
     ProbeWrapper(load_conf(args)).wrap_gdb_target()
 
 
+# 模拟（调用harness）
+# 把内存放到harness里，开始模拟
 def emulate(args: argparse.Namespace) -> None:
     """
     Drop the memory in the harness and start the emulation
@@ -71,6 +74,7 @@ def emulate(args: argparse.Namespace) -> None:
     )
 
 
+# 启动angr harness（harness还分好几类）
 def run_angr(args: argparse.Namespace) -> None:
     """
     Drop the memory in the angr harness and start concolic execution
@@ -81,6 +85,7 @@ def run_angr(args: argparse.Namespace) -> None:
     AngrHarness(load_conf(args)).get_angry(args.input_file)
 
 
+# 阻塞到probe_wrapper可以用
 def wait_for_wrapper(args: argparse.Namespace, ucf: Unicorefuzz = None) -> None:
     """
     Blocks until data from probe wrapper becomes available
@@ -100,12 +105,16 @@ def print_afl_path(args: argparse.Namespace) -> None:
     print(Unicorefuzz(load_conf(args, silent=True)).afl_path)
 
 
+# 开始fuzz
 def fuzz(args: argparse.Namespace) -> None:
     """
     Starts afl using ucf emu
     """
+    # id号，干嘛的？
     id = args.id
     restart = args.restart
+
+    # 只有id等于0可以重启
     if restart and id != "0":
         raise ValueError("Only master (`id 0`) may `reset` the state.")
     # 根据id是否为0确定模式
@@ -146,6 +155,7 @@ def fuzz(args: argparse.Namespace) -> None:
     # TODO: forward all additional parameters to AFL directly, instead.
     afl_timeout = getenv_default("AFL_TIMEOUT", "4000+")
 
+    # 确定是否添加-t 参数
     emu_params = ""
     if args.trace:
         if not args.print_outputs:
