@@ -565,20 +565,29 @@ class UnicornDbg(object):
                    entry_point=None, exit_point=None, mappings: List[Tuple[str, int, int]] = None) -> Uc:
         """
         Initializes the emulator with all needed hooks. 
+            用所有的hook初始化模拟器
         Will return the unicorn emu_instance ready to go. 
+            返回的是unicorn模拟实例
         This method can be called from external scripts to to embed udbg.
+            这个方法可以被外部脚本调用
         To kick off emulation, run start().
-        :param entry_point: Entrypoint
-        :param exit_opint: Exitpoint (where to stop emulation)
-        :param emu_instance: Optional Unicorn instance to initialize this debugger with
+            调用start方法开始模拟
+        :param entry_point: Entrypoint 入口点
+        :param exit_opint: Exitpoint (where to stop emulation) 出口点
+        :param emu_instance: Optional Unicorn instance to initialize this debugger with 模拟实例
         :param hide_binary_loader: if True, binary loader submenus will be hidden (good if embedding udbg in a target uc script)
+            # 隐藏二进制加载器
         :param arch: unicorn arch int costant
+            unicorn 架构 int常量
         :param mode: unicorn mode int costant
+            unicorn 模式 
         :param mappings: list of mappings as tuple: [(name, offset, size),...]
+            内存映射
         :return: Fully initialzied Uc instance.
         """
-
+        # 二进制加载模块
         binary_loader_module = binary_loader.BinaryLoader(self)
+        # 添加模块
         self.add_module(binary_loader_module)
 
         if emu_instance:
@@ -619,26 +628,31 @@ class UnicornDbg(object):
             [self.get_module('mappings_module').internal_add(*mapping[1:], path=mapping[0]) for mapping in mappings]
 
         # add hooks
+        # 添加hook
         self.emu_instance.hook_add(UC_HOOK_CODE, self.dbg_hook_code)
         self.emu_instance.hook_add(UC_HOOK_MEM_WRITE, self.dbg_hook_mem_access)
         self.emu_instance.hook_add(UC_HOOK_MEM_INVALID, self.dbg_hook_mem_invalid)
 
         return self.emu_instance
 
+    # 获取当前的pc
     @property
     def pc(self):
         reg = getPCCode(getArchString(self.arch, self.mode))
         return self.emu_instance.reg_read(reg)
 
     def start(self):
+        # 开始函数： 命令获取和unicorn实例创建
         """
         main start function, here we handle the command get loop and unicorn istance creation
        :return:
         """
 
+        # 创建实例
         if not self.emu_instance:
             self.initialize()
 
+        # 清空屏幕
         utils.clear_terminal()
         print(utils.get_banner())
         print('\n\n\t' + utils.white_bold('Contribute ') + 'https://github.com/iGio90/uDdbg\n')
@@ -646,109 +660,141 @@ class UnicornDbg(object):
 
         print()
         while True:
+            # prompt方法
             text = prompt(FormattedText([('ansired bold', MENU_APPENDIX + ' ')]), history=self.history, auto_suggest=AutoSuggestFromHistory())
 
             # only grant the use of empty command to replicate the last command while in cli. No executors
             if len(text) == 0 and self.last_command is not None:
+                # 解析命令
                 self.functions_instance.parse_command(self.last_command)
                 continue
 
             self.last_command = text
 
             # send command to the parser
+            # 解析命令
             self.functions_instance.parse_command(text)
 
+    # 继续模拟
     def resume_emulation(self, address=None, skip_bp=0):
+        # 从这个地方开始？
         if address is not None:
             self.current_address = address
 
+        # 跳过bp
         self.skip_bp_count = skip_bp
 
+        # 退出点
         if self.exit_point is not None:
             print(utils.white_bold("emulation") + " started at " + utils.green_bold(hex(self.current_address)))
 
             if len(self.entry_context) == 0:
                 # store the initial memory context for the restart
+                # 重新启动， 入口上下文
                 self.entry_context = {
                     'memory': {},
                     'regs': {}
                 }
+
+                # 映射表
                 map_list = self.get_module('mappings_module').get_mappings()
                 for map in map_list:
                     map_address = int(map[1], 16)
                     map_len = map[2]
+                    # 读取内存
                     self.entry_context['memory'][map_address] = bytes(self.emu_instance.mem_read(map_address, map_len))
                 # registers
+                # 寄存器
                 const = utils.get_arch_consts(self.arch)
                 regs = [k for k, v in const.__dict__.items() if
                         not k.startswith("__") and "_REG_" in k and not "INVALID" in k]
+                
                 for r in regs:
                     try:
+                        # 读取寄存器
                         self.entry_context['regs'][r] = self.emu_instance.reg_read(getattr(const, r))
                     except Exception as ex:
                         pass
                         # print("Ignoring reg: {} ({})".format(r, ex)) -> Ignored UC_X86_REG_MSR
 
+            # 开始地址
             start_addr = self.current_address
             if self.is_thumb:
                 start_addr = start_addr | 1
+            # 开始执行
             self.emu_instance.emu_start(start_addr, self.exit_point)
         else:
             print('please use \'set exit_point *offset\' to define an exit point')
 
+    # 存储
     def restore(self):
+        # 目前的地址
         self.current_address = self.entry_point
+        # 写入内存
         for addr in self.entry_context['memory']:
             m = self.entry_context['memory'][addr]
             self.emu_instance.mem_write(addr, m)
         print('restored ' + str(len(self.entry_context['memory'])) + ' memory regions.')
+        # 架构相关
         const = utils.get_arch_consts(self.arch)
+        # 写入寄存器
         for r in self.entry_context['regs']:
             self.emu_instance.reg_write(getattr(const, r), self.entry_context['regs'][r])
         print('restored ' + str(len(self.entry_context['regs'])) + ' registers.')
         print('emulator at ' + utils.green_bold(hex(self.current_address)))
 
+    # 停止模拟
     def stop_emulation(self):
         self.emu_instance.emu_stop()
 
+    # 获取模拟实例
     def get_emu_instance(self):
         """ expose emu instance """
         return self.emu_instance
 
+    # 获取capstone实例
     def get_cs_instance(self):
         """ expose capstone instance """
         if self.cs is None:
             if self.arch is not None or self.mode is not None:
+                # 获取架构名称
                 archstring = getArchString(self.arch, self.mode)
+                # 启动Capstone
                 self.cs_arch, self.cs_mode = getCapstoneSetup(archstring)
 
+            # 储存配置
             self.functions_instance.get_module('configs_module').push_config('cs_mode', self.cs_mode)
 
+            # 启动实例
             self.cs = Cs(self.cs_arch, self.cs_mode)
         return self.cs
-
+    
+    # 设置cs架构
     def set_cs_arch(self, arch):
         self.cs_arch = arch
         if self.cs_mode is not None:
             self.cs = Cs(self.cs_arch, self.cs_mode)
 
+    # 设置cs模式
     def set_cs_mode(self, mode):
         self.cs_mode = mode
         if self.cs_arch is not None:
             self.cs = Cs(self.cs_arch, self.cs_mode)
-
+    
+    # 设置入口点
     def set_entry_point(self, entry_point):
         self.entry_point = entry_point
 
+    # 设置退出点
     def set_exit_point(self, exit_point):
         self.exit_point = exit_point
-
+    # 获取架构
     def get_arch(self):
         return self.arch
-
+    # 获取模式
     def get_mode(self):
         return self.mode
-
+    # 获取cs架构
     def get_cs_arch(self):
         return self.cs_arch
 
@@ -767,6 +813,7 @@ class UnicornDbg(object):
     def get_module(self, module_key):
         return self.functions_instance.get_module(module_key)
 
+    # 批量执行
     def batch_execute(self, commands):
         self.functions_instance.batch_execute(commands)
 

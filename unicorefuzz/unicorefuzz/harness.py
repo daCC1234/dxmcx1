@@ -293,7 +293,9 @@ class Harness(Unicorefuzz):
         # 入口点
         entry_point = self.uc_read_pc(uc)
         # 退出点
-        exit_point = self.exits[0]
+        # 改了一下，这个位置不知道是不是作者写错了
+        #exit_point = self.exits[0]
+        exit_point = exits[0]
 
         # uddbg wants to know some mappings, read the current stat from unicorn to have $something...
         # TODO: Handle mappings differently? Update them at some point? + Proper exit after run?
@@ -387,11 +389,17 @@ class Harness(Unicorefuzz):
     def _raise_if_reject(self, base_address: int, dump_file_name: str) -> None:
         """
         If dump_file_name + REJECTED_ENDING exists, raises exception
+            如果dump_file_name + REJECTED_ENDING这个文件存在，触发异常
         :param base_address: the base addr we're currently working with
+            基地址：工作的基地址
         :param dump_file_name: the dump filename
+            dump的文件名字
         """
+        # 如果这个文件存在
         if os.path.isfile(dump_file_name + REJECTED_ENDING):
+            # 大佬这话文明考吗
             with open(dump_file_name + REJECTED_ENDING, "r") as f:
+                # 错误信息
                 err = "".join(f.readlines()).strip()
                 # TODO: Exception class?
                 raise Exception(

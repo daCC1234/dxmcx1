@@ -62,7 +62,7 @@ def wrap_probe(args: argparse.Namespace) -> None:
     ProbeWrapper(load_conf(args)).wrap_gdb_target()
 
 
-# 模拟（调用harness）
+# 模拟（ 调用 harness）
 # 把内存放到harness里，开始模拟
 def emulate(args: argparse.Namespace) -> None:
     """
