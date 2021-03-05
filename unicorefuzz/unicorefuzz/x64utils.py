@@ -22,6 +22,7 @@ MSR_GSBASE = 0xC0000101
 SYSCALL_OPCODE = b"\x0f\x05"
 
 
+# 设置模型特定寄存器，不知道干啥用的
 def set_msr(uc: Uc, scratch: int, msr: int, val: int) -> None:
     """
     set the given model-specific register (MSR) to the given value.
@@ -60,13 +61,18 @@ def get_msr(uc: Uc, scratch: int, msr: int) -> int:
 
     # x86: rdmsr
     buf = b"\x0f\x32"
+    # 把buf写入到 scratch中
     uc.mem_write(scratch, buf)
+    # msr低4位写入到rcx中
     uc.reg_write(UC_X86_REG_RCX, msr & 0xFFFFFFFF)
+    # 开始模拟
     uc.emu_start(scratch, scratch + len(buf), count=1)
+    # 读入eax寄存器
     eax = uc.reg_read(UC_X86_REG_EAX)
     edx = uc.reg_read(UC_X86_REG_EDX)
 
     # restore clobbered registers
+    # 重新存储clobbered registers
     uc.reg_write(UC_X86_REG_RAX, orax)
     uc.reg_write(UC_X86_REG_RDX, ordx)
     uc.reg_write(UC_X86_REG_RCX, orcx)

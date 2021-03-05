@@ -44,6 +44,7 @@ echo "[*] Performing basic sanity checks..."
 
 PLT=`uname -s`
 
+# 只支持下面几个版本
 if [ ! "$PLT" = "Linux" ] && [ ! "$PLT" = "Darwin" ] && [ ! "$PLT" = "FreeBSD" ] && [ ! "$PLT" = "NetBSD" ] && [ ! "$PLT" = "OpenBSD" ]; then
 
   echo "[-] Error: Unicorn instrumentation is unsupported on $PLT."
@@ -51,6 +52,7 @@ if [ ! "$PLT" = "Linux" ] && [ ! "$PLT" = "Darwin" ] && [ ! "$PLT" = "FreeBSD" ]
 
 fi
 
+# 检查config.h是否存在
 if [ ! -f "../config.h" ]; then
 
   echo "[-] Error: key files not found - wrong working directory?"
@@ -58,6 +60,7 @@ if [ ! -f "../config.h" ]; then
 
 fi
 
+# 检查afl-showmap是否存在
 if [ ! -f "../afl-showmap" ]; then
 
   echo "[-] Error: ../afl-showmap not found - compile AFL first!"
@@ -71,6 +74,7 @@ EASY_INSTALL='easy_install'
 TARCMD=tar
 
 if [ "$PLT" = "Linux" ]; then
+# cpu的属性？
   CORES=`nproc`
 fi
 
@@ -93,6 +97,7 @@ if [ "$PLT" = "NetBSD" ] || [ "$PLT" = "OpenBSD" ]; then
   TARCMD=gtar
 fi
 
+# 一些必须有的命令
 PREREQ_NOTFOUND=
 for i in $PYTHONBIN automake autoconf git $MAKECMD $TARCMD; do
 
@@ -107,6 +112,7 @@ for i in $PYTHONBIN automake autoconf git $MAKECMD $TARCMD; do
 
 done
 
+# easy_install 是否存在
 if ! command -v $EASY_INSTALL >/dev/null; then
 
   # work around for installs with executable easy_install
@@ -132,6 +138,7 @@ if ! command -v $EASY_INSTALL >/dev/null; then
 
 fi
 
+# 不能用afl编译这个东西
 if echo "$CC" | grep -qF /afl-; then
 
   echo "[-] Error: do not use afl-gcc or afl-clang to compile this tool."
@@ -147,6 +154,7 @@ echo "[+] All checks passed!"
 
 echo "[*] Making sure unicornafl is checked out"
 
+# 子模块加载
 git status 1>/dev/null 2>/dev/null
 if [ $? -eq 0 ]; then
   echo "[*] initializing unicornafl submodule"
@@ -185,8 +193,10 @@ $MAKECMD clean  # make doesn't seem to work for unicorn
 # Fixed to 1 core for now as there is a race condition in the makefile
 UNICORN_QEMU_FLAGS="--python=$PYTHONBIN" $MAKECMD -j1 || exit 1
 
+# 成功建立进程
 echo "[+] Build process successful!"
 
+# 调用setup.py
 echo "[*] Installing Unicorn python bindings..."
 cd bindings/python || exit 1
 if [ -z "$VIRTUAL_ENV" ]; then

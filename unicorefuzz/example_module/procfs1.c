@@ -7,15 +7,22 @@
 #define PROCFS_NAME       "buffer10"
 #define PROCFS_MAX_SIZE   10
 
+// 目录入口
 struct proc_dir_entry *entry;
+
+// procfs 缓冲区
 static char procfs_buffer[PROCFS_MAX_SIZE];
 
+// 写回调函数
 static ssize_t write_callback(struct file *file, const char __user *ubuf, size_t count, loff_t *ppos)
 {
   char local_buffer[PROCFS_MAX_SIZE*2];
   char small_local_buffer[PROCFS_MAX_SIZE];
   //char *buffer = kmalloc(PROCFS_MAX_SIZE, GFP_KERNEL);
+  // 从用户处拷贝过来
   copy_from_user(local_buffer, ubuf, PROCFS_MAX_SIZE*2);
+
+  // 分情况进行处理
   if(local_buffer[0] == 'A')
   {
     //strcpy(buffer, local_buffer);
@@ -34,6 +41,7 @@ static ssize_t write_callback(struct file *file, const char __user *ubuf, size_t
   return count;
 }
 
+// 读回调
 static ssize_t read_callback(struct file *file, char __user *ubuf, size_t count, loff_t *ppos)
 {
   return 0;

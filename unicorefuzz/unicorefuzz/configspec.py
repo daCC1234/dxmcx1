@@ -11,7 +11,12 @@ import os
 
 # 类型的各种库，第一次见hh
 from types import ModuleType
+'''
+``types`` 模块包含了标准解释器定义的所有类型的类型对象,  
+同一类型的所有对象共享一个类型对象. 你可以使用 ``is`` 来检查一个对象是不是属于某个给定类型.
+'''
 from typing import (
+    # typing: ；类型暗示 -> :等
     List,
     Union,
     Any,
@@ -219,6 +224,7 @@ def clean_source(func: Callable[[Any], Any]) -> str:
     :return: The included source code
     """
     # 调用inspect的getsource方法，返回的应该是一个字符串，然后处理之
+    # inspect.getsource 获得的是一个另外一个模块的函数
     source = inspect.getsource(func).split(":", 1)[1].strip()
     # 如果以","结尾
     if source.endswith(","):
